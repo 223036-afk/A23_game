@@ -1,0 +1,600 @@
+#302b63, #242linea<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Crystal Match 3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Poppins:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background:r-gradient(135deg, #0f0c29,43e);
+            color: white;
+            touch-action: none; /* 防止スワイプによる画面スクロール */
+            overflow: hidden;
+        }
+        h1 {
+            font-family: 'Poppins', sans-serif;
+            text-shadow: 0 0 20px rgba(167, 139, 250, 0.6);
+        }
+        
+        #game-board {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1 / 1;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.05);
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .tile {
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: top 0.3s ease-in-out, left 0.3s ease-in-out, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+            user-select: none;
+            width: 12.5%; /* 100% / 8 cols */
+            height: 12.5%; /* 100% / 8 rows */
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        }
+
+        @media (min-width: 600px) {
+            .tile { font-size: 3rem; }
+        }
+
+        .tile:hover {
+            transform: scale(1.1);
+        }
+
+        .tile.selected {
+            transform: scale(1.2);
+            filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8));
+            z-index: 10;
+        }
+
+        .tile.pop {
+            transform: scale(0);
+            opacity: 0;
+        }
+
+        .hud-glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 浮遊するパーティクル背景の簡易表現 */
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: -1;
+            opacity: 0.5;
+            animation: float 10s infinite alternate ease-in-out;
+        }
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(30px, -50px) scale(1.2); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4 relative">
+
+    <!-- 背景装飾 -->
+    <div class="bg-orb w-64 h-64 bg-purple-600 top-10 left-10"></div>
+    <div class="bg-orb w-80 h-80 bg-blue-600 bottom-10 right-10" style="animation-delay: -5s;"></div>
+
+    <!-- ヘッダー＆スコア -->
+    <div class="w-full max-w-md flex justify-between items-end mb-6 px-2">
+        <div>
+            <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-300">
+                Crystal Match
+            </h1>
+            <p class="text-sm text-gray-300 mt-1">Tap two adjacent crystals to swap!</p>
+        </div>
+        <div class="flex gap-2">
+            <div class="hud-glass px-4 py-3 rounded-xl text-center">
+                <div class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Target</div>
+                <div class="text-2xl font-bold text-white flex items-center justify-center gap-1">
+                    <span id="target-icon">🌟</span>
+                    <span id="target-count" class="text-pink-300">20</span>
+                </div>
+            </div>
+            <div class="hud-glass px-4 py-3 rounded-xl text-center">
+                <div class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Moves</div>
+                <div id="moves" class="text-3xl font-bold text-blue-300 leading-none">20</div>
+            </div>
+            <div class="hud-glass px-4 py-3 rounded-xl text-center">
+                <div class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Score</div>
+                <div id="score" class="text-3xl font-bold text-white leading-none">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ゲームボード -->
+    <div id="game-board">
+        <!-- JSでタイルを生成 -->
+    </div>
+
+    <!-- メッセージレイヤー -->
+    <div id="message-overlay" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-500 z-50">
+        <div id="message-text" class="text-5xl font-extrabold text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] transform scale-50 transition-transform duration-500">
+            Awesome!
+        </div>
+    </div>
+
+    <!-- ゲームオーバーレイヤー -->
+    <div id="game-over-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-80 pointer-events-none opacity-0 transition-opacity duration-500 z-50 backdrop-blur-sm">
+        <h2 class="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 mb-4 drop-shadow-lg">Out of Moves!</h2>
+        <p class="text-2xl text-white mb-8">Final Score: <span id="final-score" class="font-bold text-yellow-300">0</span></p>
+        <button onclick="restartGame()" class="px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full text-xl font-bold text-white shadow-[0_0_15px_rgba(167,139,250,0.5)] hover:scale-105 transition-transform">
+            Try Again
+        </button>
+    </div>
+
+    <!-- ゲームクリアレイヤー -->
+    <div id="game-clear-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-80 pointer-events-none opacity-0 transition-opacity duration-500 z-50 backdrop-blur-sm">
+        <h2 class="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-400 mb-4 drop-shadow-lg">Level Cleared!</h2>
+        <p class="text-2xl text-white mb-8">Final Score: <span id="clear-score" class="font-bold text-yellow-300">0</span></p>
+        <button onclick="restartGame()" class="px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full text-xl font-bold text-white shadow-[0_0_15px_rgba(167,139,250,0.5)] hover:scale-105 transition-transform">
+            Next Level
+        </button>
+    </div>
+
+    <script>
+        // --- 設定・定数 ---
+        const ROWS = 8;
+        const COLS = 8;
+        const INITIAL_MOVES = 20;
+        const TILE_TYPES = ['💎', '🔮', '🌟', '🌙', '🍀', '💖']; // ジェムの種類
+        const BOARD_EL = document.getElementById('game-board');
+        const SCORE_EL = document.getElementById('score');
+        const MOVES_EL = document.getElementById('moves');
+        const TARGET_ICON_EL = document.getElementById('target-icon');
+        const TARGET_COUNT_EL = document.getElementById('target-count');
+        const MSG_OVERLAY = document.getElementById('message-overlay');
+        const MSG_TEXT = document.getElementById('message-text');
+        const GAMEOVER_OVERLAY = document.getElementById('game-over-overlay');
+        const GAMECLEAR_OVERLAY = document.getElementById('game-clear-overlay');
+        const FINAL_SCORE_EL = document.getElementById('final-score');
+        const CLEAR_SCORE_EL = document.getElementById('clear-score');
+
+        // --- 状態管理 ---
+        let board = [];
+        let score = 0;
+        let movesLeft = INITIAL_MOVES;
+        let targetType = '';
+        let targetCount = 0;
+        let isGameOver = false;
+        let isGameClear = false;
+        let selectedTile = null;
+        let isAnimating = false;
+        let tileIdCounter = 0;
+        let audioInitialized = false;
+
+        // --- サウンド設定 (Tone.js) ---
+        let popSynth, swapSynth, errorSynth, gameOverSynth;
+
+        function initAudio() {
+            if (audioInitialized) return;
+            
+            // マッチ時の軽快な音
+            popSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.5 }
+            }).toDestination();
+            popSynth.volume.value = -10;
+
+            // スワップ時のクリック音
+            swapSynth = new Tone.MembraneSynth({
+                pitchDecay: 0.01,
+                octaves: 1,
+                oscillator: { type: "square" },
+                envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.01 }
+            }).toDestination();
+            swapSynth.volume.value = -20;
+
+            // エラー時の音
+            errorSynth = new Tone.Synth({
+                oscillator: { type: "triangle" },
+                envelope: { attack: 0.05, decay: 0.2, sustain: 0, release: 0.2 }
+            }).toDestination();
+            errorSynth.volume.value = -15;
+
+            // ゲームオーバー時の音
+            gameOverSynth = new Tone.FMSynth({
+                modulationIndex: 0,
+                envelope: { attack: 0.1, decay: 0.5, sustain: 0.2, release: 2 }
+            }).toDestination();
+            gameOverSynth.volume.value = -10;
+
+            Tone.start();
+            audioInitialized = true;
+        }
+
+        function playSound(type, combo = 1) {
+            if (!audioInitialized) return;
+            try {
+                if (type === 'swap') {
+                    swapSynth.triggerAttackRelease("C4", "8n");
+                } else if (type === 'pop') {
+                    // コンボ数に応じて音程を上げる
+                    const notes = ["C5", "E5", "G5", "C6", "E6"];
+                    const note = notes[Math.min(combo - 1, notes.length - 1)];
+                    popSynth.triggerAttackRelease(note, "16n");
+                } else if (type === 'error') {
+                    errorSynth.triggerAttackRelease("C3", "8n");
+                } else if (type === 'gameover') {
+                    gameOverSynth.triggerAttackRelease("G2", "2n");
+                }
+            } catch (e) { console.warn("Audio error:", e); }
+        }
+
+        // --- ユーティリティ ---
+        const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+        const randomType = () => TILE_TYPES[Math.floor(Math.random() * TILE_TYPES.length)];
+
+        // --- タイルクラス ---
+        class Tile {
+            constructor(r, c, type) {
+                this.id = `tile_${tileIdCounter++}`;
+                this.r = r;
+                this.c = c;
+                this.type = type;
+                this.element = document.createElement('div');
+                this.element.className = 'tile';
+                this.element.innerText = this.type;
+                this.element.dataset.id = this.id;
+                
+                // クリック（タップ）イベント
+                this.element.addEventListener('click', () => handleTileClick(this));
+                
+                BOARD_EL.appendChild(this.element);
+                this.updatePosition();
+            }
+
+            updatePosition() {
+                // パーセンテージで位置を指定（レスポンシブ対応）
+                this.element.style.top = `${(this.r / ROWS) * 100}%`;
+                this.element.style.left = `${(this.c / COLS) * 100}%`;
+            }
+
+            setType(newType) {
+                this.type = newType;
+                this.element.innerText = this.type;
+            }
+
+            pop() {
+                this.element.classList.add('pop');
+                setTimeout(() => {
+                    if (this.element.parentNode) {
+                        this.element.parentNode.removeChild(this.element);
+                    }
+                }, 300); // CSS transitionに合わせる
+            }
+        }
+
+        // --- 初期化 ---
+        function initGame() {
+            score = 0;
+            movesLeft = INITIAL_MOVES;
+            isGameOver = false;
+            isGameClear = false;
+
+            // 目標の設定 (ランダムなジェムを20個)
+            targetType = TILE_TYPES[Math.floor(Math.random() * TILE_TYPES.length)];
+            targetCount = 20;
+
+            updateScore(0);
+            updateMoves();
+            updateTarget();
+            
+            GAMEOVER_OVERLAY.classList.add('opacity-0', 'pointer-events-none');
+            GAMECLEAR_OVERLAY.classList.add('opacity-0', 'pointer-events-none');
+
+            // 初回ボード生成（初期状態でマッチがないようにする）
+            do {
+                BOARD_EL.innerHTML = '';
+                board = [];
+                for (let r = 0; r < ROWS; r++) {
+                    let row = [];
+                    for (let c = 0; c < COLS; c++) {
+                        row.push(new Tile(r, c, randomType()));
+                    }
+                    board.push(row);
+                }
+            } while (checkMatches().length > 0);
+
+            // ユーザーアクションでオーディオ初期化を促す
+            document.body.addEventListener('pointerdown', initAudio, { once: true });
+        }
+
+        // --- インタラクションロジック ---
+        async function handleTileClick(tile) {
+            if (isAnimating || isGameOver || isGameClear) return;
+
+            if (!selectedTile) {
+                // 選択
+                selectedTile = tile;
+                tile.element.classList.add('selected');
+                playSound('swap');
+            } else if (selectedTile === tile) {
+                // 選択解除
+                selectedTile.element.classList.remove('selected');
+                selectedTile = null;
+                playSound('swap');
+            } else {
+                // スワップ判定
+                const isAdjacent = (Math.abs(selectedTile.r - tile.r) === 1 && selectedTile.c === tile.c) ||
+                                   (Math.abs(selectedTile.c - tile.c) === 1 && selectedTile.r === tile.r);
+                
+                const firstTile = selectedTile;
+                firstTile.element.classList.remove('selected');
+                selectedTile = null;
+
+                if (isAdjacent) {
+                    await attemptSwap(firstTile, tile);
+                } else {
+                    // 隣接していない場合は新しく選択
+                    selectedTile = tile;
+                    tile.element.classList.add('selected');
+                    playSound('swap');
+                }
+            }
+        }
+
+        async function attemptSwap(t1, t2) {
+            isAnimating = true;
+            
+            // 視覚的・論理的スワップ
+            swapTilesLogic(t1, t2);
+            playSound('swap');
+            await sleep(300); // CSSアニメーション待ち
+
+            let matches = checkMatches();
+
+            if (matches.length > 0) {
+                // マッチ成功 -> カスケード処理へ
+                movesLeft--;
+                updateMoves();
+                await processCascades(1);
+                
+                if (targetCount <= 0) {
+                    handleGameClear();
+                } else if (movesLeft <= 0) {
+                    handleGameOver();
+                }
+            } else {
+                // マッチ失敗 -> 元に戻す
+                playSound('error');
+                swapTilesLogic(t1, t2);
+                await sleep(300);
+            }
+            
+            isAnimating = false;
+        }
+
+        function swapTilesLogic(t1, t2) {
+            // グリッド座標の入れ替え
+            const tempR = t1.r;
+            const tempC = t1.c;
+            t1.r = t2.r;
+            t1.c = t2.c;
+            t2.r = tempR;
+            t2.c = tempC;
+
+            // ボード配列の入れ替え
+            board[t1.r][t1.c] = t1;
+            board[t2.r][t2.c] = t2;
+
+            // DOM位置の更新
+            t1.updatePosition();
+            t2.updatePosition();
+        }
+
+        // --- マッチ判定と処理 ---
+        function checkMatches() {
+            let matchedSet = new Set();
+
+            // 水平チェック
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 2; c++) {
+                    let type = board[r][c]?.type;
+                    if (!type) continue;
+                    
+                    if (board[r][c+1]?.type === type && board[r][c+2]?.type === type) {
+                        matchedSet.add(board[r][c]);
+                        matchedSet.add(board[r][c+1]);
+                        matchedSet.add(board[r][c+2]);
+                        
+                        // 4個以上つながっている場合
+                        let i = 3;
+                        while (c + i < COLS && board[r][c+i]?.type === type) {
+                            matchedSet.add(board[r][c+i]);
+                            i++;
+                        }
+                    }
+                }
+            }
+
+            // 垂直チェック
+            for (let c = 0; c < COLS; c++) {
+                for (let r = 0; r < ROWS - 2; r++) {
+                    let type = board[r][c]?.type;
+                    if (!type) continue;
+                    
+                    if (board[r+1][c]?.type === type && board[r+2][c]?.type === type) {
+                        matchedSet.add(board[r][c]);
+                        matchedSet.add(board[r+1][c]);
+                        matchedSet.add(board[r+2][c]);
+                        
+                        let i = 3;
+                        while (r + i < ROWS && board[r+i][c]?.type === type) {
+                            matchedSet.add(board[r+i][c]);
+                            i++;
+                        }
+                    }
+                }
+            }
+
+            return Array.from(matchedSet);
+        }
+
+        async function processCascades(comboMultiplier) {
+            let matches = checkMatches();
+            if (matches.length === 0) return;
+
+            // スコア計算＆ポップアニメーション
+            playSound('pop', comboMultiplier);
+            const points = matches.length * 10 * comboMultiplier;
+            updateScore(points);
+
+            if (comboMultiplier > 1) {
+                showComboMessage(`${comboMultiplier}x COMBO!`);
+            } else if (matches.length >= 5) {
+                showComboMessage(`AMAZING!`);
+            }
+
+            matches.forEach(tile => {
+                if (tile.type === targetType) {
+                    targetCount--;
+                    if (targetCount < 0) targetCount = 0;
+                }
+                tile.pop();
+                board[tile.r][tile.c] = null; // 配列から削除
+            });
+
+            updateTarget();
+
+            await sleep(300); // ポップ完了待ち
+
+            // 落下処理
+            let dropped = false;
+            for (let c = 0; c < COLS; c++) {
+                for (let r = ROWS - 1; r >= 0; r--) {
+                    if (board[r][c] === null) {
+                        // 上を探して落とす
+                        for (let k = r - 1; k >= 0; k--) {
+                            if (board[k][c] !== null) {
+                                let tile = board[k][c];
+                                tile.r = r;
+                                board[r][c] = tile;
+                                board[k][c] = null;
+                                tile.updatePosition();
+                                dropped = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (dropped) await sleep(300);
+
+            // 新しいタイルを上部から補充
+            for (let c = 0; c < COLS; c++) {
+                for (let r = 0; r < ROWS; r++) {
+                    if (board[r][c] === null) {
+                        // 画面外（上部）から生成して落とす演出
+                        let newTile = new Tile(-1, c, randomType());
+                        board[r][c] = newTile;
+                        // DOMレンダリング待ちのあと正規の位置へ
+                        setTimeout(() => {
+                            newTile.r = r;
+                            newTile.updatePosition();
+                        }, 50);
+                    }
+                }
+            }
+            
+            await sleep(350); // 補充アニメーション待ち
+
+            // 連鎖チェック（再帰）
+            await processCascades(comboMultiplier + 1);
+        }
+
+        // --- UI演出 ---
+        function updateScore(points) {
+            score += points;
+            SCORE_EL.innerText = score;
+            if (points > 0) {
+                SCORE_EL.classList.add('text-yellow-300', 'scale-125');
+                setTimeout(() => {
+                    SCORE_EL.classList.remove('text-yellow-300', 'scale-125');
+                    SCORE_EL.classList.add('transition-transform', 'duration-300');
+                }, 150);
+            }
+        }
+
+        function updateMoves() {
+            MOVES_EL.innerText = movesLeft;
+            if (movesLeft <= 5) {
+                MOVES_EL.classList.add('text-red-400');
+                MOVES_EL.classList.remove('text-blue-300');
+            } else {
+                MOVES_EL.classList.remove('text-red-400');
+                MOVES_EL.classList.add('text-blue-300');
+            }
+        }
+
+        function updateTarget() {
+            TARGET_ICON_EL.innerText = targetType;
+            TARGET_COUNT_EL.innerText = targetCount;
+            if (targetCount <= 0) {
+                TARGET_COUNT_EL.classList.replace('text-pink-300', 'text-green-400');
+            } else {
+                TARGET_COUNT_EL.classList.replace('text-green-400', 'text-pink-300');
+            }
+        }
+
+        function handleGameOver() {
+            isGameOver = true;
+            FINAL_SCORE_EL.innerText = score;
+            playSound('gameover');
+            GAMEOVER_OVERLAY.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function handleGameClear() {
+            isGameClear = true;
+            CLEAR_SCORE_EL.innerText = score;
+            // 簡易的にpop音を連続で鳴らしてクリア音とする
+            playSound('pop', 3);
+            setTimeout(() => playSound('pop', 4), 150);
+            setTimeout(() => playSound('pop', 5), 300);
+            GAMECLEAR_OVERLAY.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function restartGame() {
+            initGame();
+        }
+
+        function showComboMessage(text) {
+            MSG_TEXT.innerText = text;
+            MSG_OVERLAY.classList.remove('opacity-0');
+            MSG_TEXT.classList.remove('scale-50');
+            MSG_TEXT.classList.add('scale-110');
+            
+            setTimeout(() => {
+                MSG_OVERLAY.classList.add('opacity-0');
+                MSG_TEXT.classList.remove('scale-110');
+                MSG_TEXT.classList.add('scale-50');
+            }, 1000);
+        }
+
+        // --- 起動 ---
+        window.onload = initGame;
+
+    </script>
+</body>
+</html>
