@@ -1,4 +1,4 @@
-#302b63, #242linea<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -10,7 +10,7 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background:r-gradient(135deg, #0f0c29,43e);
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
             color: white;
             touch-action: none; /* 防止スワイプによる画面スクロール */
             overflow: hidden;
@@ -96,26 +96,26 @@
     <div class="bg-orb w-80 h-80 bg-blue-600 bottom-10 right-10" style="animation-delay: -5s;"></div>
 
     <!-- ヘッダー＆スコア -->
-    <div class="w-full max-w-md flex justify-between items-end mb-6 px-2">
-        <div>
+    <div class="w-full max-w-lg flex flex-col gap-4 mb-6 px-2">
+        <div class="text-center">
             <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-300">
                 Crystal Match
             </h1>
             <p class="text-sm text-gray-300 mt-1">Tap two adjacent crystals to swap!</p>
         </div>
-        <div class="flex gap-2">
-            <div class="hud-glass px-4 py-3 rounded-xl text-center">
+        <div class="grid grid-cols-3 gap-2">
+            <div class="hud-glass px-2 py-3 rounded-xl text-center min-w-0">
                 <div class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Target</div>
                 <div class="text-2xl font-bold text-white flex items-center justify-center gap-1">
                     <span id="target-icon">🌟</span>
                     <span id="target-count" class="text-pink-300">20</span>
                 </div>
             </div>
-            <div class="hud-glass px-4 py-3 rounded-xl text-center">
+            <div class="hud-glass px-2 py-3 rounded-xl text-center min-w-0">
                 <div class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Moves</div>
                 <div id="moves" class="text-3xl font-bold text-blue-300 leading-none">20</div>
             </div>
-            <div class="hud-glass px-4 py-3 rounded-xl text-center">
+            <div class="hud-glass px-2 py-3 rounded-xl text-center min-w-0">
                 <div class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Score</div>
                 <div id="score" class="text-3xl font-bold text-white leading-none">0</div>
             </div>
